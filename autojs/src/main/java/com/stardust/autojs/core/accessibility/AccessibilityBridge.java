@@ -82,10 +82,11 @@ public abstract class AccessibilityBridge {
             }
             return roots;
         }
-        if ((mMode & MODE_FAST) != 0) {
-            return Collections.singletonList(service.fastRootInActiveWindow());
+        AccessibilityNodeInfo root = getBestRootInActiveWindow(service);
+        if (root == null) {
+            return Collections.emptyList();
         }
-        return Collections.singletonList(service.getRootInActiveWindow());
+        return Collections.singletonList(root);
     }
 
     @Nullable
@@ -101,20 +102,25 @@ public abstract class AccessibilityBridge {
             }
             return null;
         }
-        if ((mMode & MODE_FAST) != 0) {
-            return service.fastRootInActiveWindow();
-        }
-        return service.getRootInActiveWindow();
+        return getBestRootInActiveWindow(service);
     }
 
     public AccessibilityNodeInfo getRootInActiveWindow() {
         AccessibilityService service = getService();
         if (service == null)
             return null;
+        return getBestRootInActiveWindow(service);
+    }
+
+    private AccessibilityNodeInfo getBestRootInActiveWindow(AccessibilityService service) {
         if ((mMode & MODE_FAST) != 0) {
             return service.fastRootInActiveWindow();
         }
-        return service.getRootInActiveWindow();
+        AccessibilityNodeInfo root = service.getRootInActiveWindow();
+        if (root != null) {
+            return root;
+        }
+        return service.fastRootInActiveWindow();
     }
 
     public void setWindowFilter(WindowFilter windowFilter) {

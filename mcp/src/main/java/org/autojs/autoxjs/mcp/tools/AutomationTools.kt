@@ -100,21 +100,12 @@ class FindElementTool(private val ctx: McpToolContext) : McpTool {
         return try {
             val timeout = req.timeoutMillis ?: 2000
             val obj = selector.findOne(timeout)
-            if (obj == null) {
-                McpResponse.error("NotFound", "element not found")
-            } else {
-                val rect = obj.bounds()
-                val data = mapOf(
-                    "bounds" to mapOf("left" to rect.left, "top" to rect.top, "right" to rect.right, "bottom" to rect.bottom),
-                    "center" to mapOf("x" to rect.centerX(), "y" to rect.centerY()),
-                    "text" to obj.text(),
-                    "id" to obj.id(),
-                    "desc" to obj.desc(),
-                    "className" to obj.className(),
-                    "packageName" to obj.packageName()
-                )
-                McpResponse.ok(data)
+            if (obj != null) {
+                return McpResponse.ok(uiObjectToMap(obj) + mapOf("source" to "selector"))
             }
+            val node = findNodeWithTimeout(req, timeout)
+                ?: return McpResponse.error("NotFound", "element not found")
+            McpResponse.ok(nodeInfoToMap(node) + mapOf("source" to "layout_inspector"))
         } catch (e: Exception) {
             McpResponse.error("Failed", e.message ?: "find_element failed")
         }
@@ -134,35 +125,21 @@ class FindElementsTool(private val ctx: McpToolContext) : McpTool {
             val timeout = req.timeoutMillis ?: 2000
             val limit = req.limit?.takeIf { it > 0 } ?: 20
             val collection = findCollectionWithTimeout(selector, timeout)
-            if (collection.isEmpty) {
-                return McpResponse.ok(mapOf("count" to 0, "elements" to emptyList<Map<String, Any>>()))
-            }
-            val results = ArrayList<Map<String, Any?>>(minOf(limit, collection.size()))
-            for (obj in collection) {
-                if (obj == null) {
-                    continue
+            if (collection.nonEmpty()) {
+                val results = ArrayList<Map<String, Any?>>(minOf(limit, collection.size()))
+                for (obj in collection) {
+                    if (obj == null) {
+                        continue
+                    }
+                    results.add(uiObjectToMap(obj) + mapOf("source" to "selector"))
+                    if (results.size >= limit) {
+                        break
+                    }
                 }
-                val rect = obj.bounds()
-                results.add(
-                    mapOf(
-                        "bounds" to mapOf(
-                            "left" to rect.left,
-                            "top" to rect.top,
-                            "right" to rect.right,
-                            "bottom" to rect.bottom
-                        ),
-                        "center" to mapOf("x" to rect.centerX(), "y" to rect.centerY()),
-                        "text" to obj.text(),
-                        "id" to obj.id(),
-                        "desc" to obj.desc(),
-                        "className" to obj.className(),
-                        "packageName" to obj.packageName()
-                    )
-                )
-                if (results.size >= limit) {
-                    break
-                }
+                return McpResponse.ok(mapOf("count" to results.size, "elements" to results))
             }
+            val nodes = findNodesWithTimeout(req, timeout, limit)
+            val results = nodes.map { nodeInfoToMap(it) + mapOf("source" to "layout_inspector") }
             McpResponse.ok(mapOf("count" to results.size, "elements" to results))
         } catch (e: Exception) {
             McpResponse.error("Failed", e.message ?: "find_elements failed")
@@ -398,6 +375,116 @@ private suspend fun captureLayout(inspector: LayoutInspector): NodeInfo? {
         return null
     }
     return withTimeoutOrNull(TimeUnit.SECONDS.toMillis(3)) { deferred.await() }
+}
+
+private suspend fun findNodeWithTimeout(
+    req: FindElementRequest,
+    timeoutMillis: Long
+): NodeInfo? {
+    return findNodesWithTimeout(req, timeoutMillis, 1).firstOrNull()
+}
+
+private suspend fun findNodesWithTimeout(
+    req: FindElementRequest,
+    timeoutMillis: Long,
+    limit: Int
+): List<NodeInfo> {
+    val deadline = SystemClock.uptimeMillis() + timeoutMillis.coerceAtLeast(0)
+    while (true) {
+        val root = captureLayout(AutoJs.instance.layoutInspector)
+        if (root != null) {
+            val results = ArrayList<NodeInfo>()
+            collectMatchingNodes(root, req, results, limit)
+            if (results.isNotEmpty()) {
+                return results
+            }
+        }
+        if (timeoutMillis <= 0 || SystemClock.uptimeMillis() >= deadline) {
+            return emptyList()
+        }
+        Thread.sleep(50)
+    }
+}
+
+private suspend fun findNodesWithTimeout(
+    req: FindElementsRequest,
+    timeoutMillis: Long,
+    limit: Int
+): List<NodeInfo> {
+    return findNodesWithTimeout(
+        FindElementRequest(
+            text = req.text,
+            id = req.id,
+            desc = req.desc,
+            className = req.className,
+            timeoutMillis = req.timeoutMillis
+        ),
+        timeoutMillis,
+        limit
+    )
+}
+
+private fun collectMatchingNodes(
+    node: NodeInfo,
+    req: FindElementRequest,
+    results: MutableList<NodeInfo>,
+    limit: Int
+) {
+    if (results.size >= limit) {
+        return
+    }
+    if (matchesNode(node, req)) {
+        results.add(node)
+        if (results.size >= limit) {
+            return
+        }
+    }
+    node.getChildren().forEach { child ->
+        collectMatchingNodes(child, req, results, limit)
+        if (results.size >= limit) {
+            return
+        }
+    }
+}
+
+private fun matchesNode(node: NodeInfo, req: FindElementRequest): Boolean {
+    req.text?.takeIf { it.isNotBlank() }?.let { if (node.text != it) return false }
+    req.id?.takeIf { it.isNotBlank() }?.let {
+        val fullId = node.fullId
+        if (node.id != it && fullId != it) return false
+    }
+    req.desc?.takeIf { it.isNotBlank() }?.let { if (node.desc != it) return false }
+    req.className?.takeIf { it.isNotBlank() }?.let { if (node.className != it) return false }
+    return true
+}
+
+private fun uiObjectToMap(obj: com.stardust.automator.UiObject): Map<String, Any?> {
+    val rect = obj.bounds()
+    return mapOf(
+        "bounds" to mapOf("left" to rect.left, "top" to rect.top, "right" to rect.right, "bottom" to rect.bottom),
+        "center" to mapOf("x" to rect.centerX(), "y" to rect.centerY()),
+        "text" to obj.text(),
+        "id" to obj.id(),
+        "desc" to obj.desc(),
+        "className" to obj.className(),
+        "packageName" to obj.packageName()
+    )
+}
+
+private fun nodeInfoToMap(node: NodeInfo): Map<String, Any?> {
+    val rect = node.boundsInScreen
+    return mapOf(
+        "bounds" to mapOf("left" to rect.left, "top" to rect.top, "right" to rect.right, "bottom" to rect.bottom),
+        "center" to mapOf("x" to rect.centerX(), "y" to rect.centerY()),
+        "text" to node.text,
+        "id" to node.id,
+        "desc" to node.desc,
+        "className" to node.className,
+        "packageName" to node.packageName,
+        "depth" to node.depth,
+        "indexInParent" to node.indexInParent,
+        "drawingOrder" to node.drawingOrder
+    )
 }
 
 private fun buildCompactNodes(node: NodeInfo, parentPackage: String?, isRoot: Boolean): List<Map<String, Any?>> {

@@ -5,6 +5,7 @@
         <service
             android:name=".McpServerService"
             android:exported="false"
+            android:process="@string/text_script_process_name"
             android:foregroundServiceType="dataSync" />
     </application>
 </manifest>
