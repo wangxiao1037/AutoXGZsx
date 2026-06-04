@@ -20,6 +20,8 @@
 > - Adjusted MCP-related Service / Manifest configuration to improve foreground service permissions and process behavior.
 > - Refined `AutoJs` initialization timing to avoid duplicate initialization issues and make main-process startup logic more explicit.
 > - Added a local `build.sh` script for development builds, along with Gradle / Ktor-related configuration updates to make fork-based development and packaging easier.
+> - Fixed cases where accessibility root lookup could return empty nodes by adding a fallback between `getRootInActiveWindow()` and `fastRootInActiveWindow()`, improving UI tree stability.
+> - Enhanced MCP `find_element` / `find_elements` so they fall back to LayoutInspector node matching when selector lookup fails, improving element discovery in apps with incomplete accessibility exposure.
 >
 > If you plan to use this fork, please review the commit history and source changes here first to confirm that these customizations match your use case.
 

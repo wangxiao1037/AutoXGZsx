@@ -21,6 +21,8 @@
 > - 调整 MCP 相关 Service / Manifest 配置，改进前台服务权限与进程行为，提升运行稳定性。
 > - 调整 `AutoJs` 初始化时序，避免重复初始化带来的异常，并让主进程中的启动逻辑更明确。
 > - 补充适用于本地环境的 `build.sh` 构建脚本，同时更新部分 Gradle / Ktor 相关配置，方便在 fork 基础上继续开发与打包。
+> - 修复部分场景下无障碍根节点获取为空的问题，增加 `getRootInActiveWindow()` 与 `fastRootInActiveWindow()` 的兜底策略，提升界面树获取稳定性。
+> - 增强 MCP `find_element` / `find_elements` 工具，在选择器查找失败时回退到 LayoutInspector 节点树匹配，改善部分应用控件无法直接命中的情况。
 >
 > 如果你正在使用本 fork，请优先参考这里的提交记录与源码实现，了解这些定制改动是否符合你的使用场景。
 
