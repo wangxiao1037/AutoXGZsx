@@ -25,6 +25,13 @@
 >
 > If you plan to use this fork, please review the commit history and source changes here first to confirm that these customizations match your use case.
 
+### Fixed Bugs in This Fork
+
+- Fixed a process mismatch issue where the accessibility service and MCP service could run outside the script process, causing inconsistent AutoJs instances, accessibility context, and MCP tool behavior.
+- Fixed repeated MCP service starts with the same configuration, which could cause duplicate startup logs or port binding risk.
+- Fixed cases where `getRootInActiveWindow()` could return an empty root in normal mode, causing empty UI trees and failed element lookup; the bridge now falls back between normal root and fast root automatically.
+- Fixed MCP `find_element` / `find_elements` returning `NotFound` when selector lookup failed in apps with incomplete accessibility exposure; the tools now fall back to LayoutInspector node matching and report the node source.
+
 A JavaScript runtime and development environment on the Android platform that supports barrier-free services. Its development goal is similar to JsBox and Workflow.
 
 

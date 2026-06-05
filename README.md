@@ -26,6 +26,13 @@
 >
 > 如果你正在使用本 fork，请优先参考这里的提交记录与源码实现，了解这些定制改动是否符合你的使用场景。
 
+### 本次修复的 Bug
+
+- 修复无障碍服务与 MCP 服务未固定到脚本进程时，可能出现 AutoJs 实例、无障碍上下文和 MCP 工具运行进程不一致的问题。
+- 修复 MCP 服务重复启动时可能重复绑定同一配置、造成重复启动日志或端口占用风险的问题。
+- 修复普通模式下 `getRootInActiveWindow()` 偶发返回空，导致界面树为空、控件查找失败的问题；现在会在普通 root 与 fast root 之间自动兜底。
+- 修复 MCP `find_element` / `find_elements` 只依赖选择器时，在部分应用无障碍节点暴露不完整的情况下直接返回 `NotFound` 的问题；现在会回退到 LayoutInspector 节点树匹配，并返回节点来源。
+
 一个支持无障碍服务的Android平台上的JavaScript 运行环境 和 开发环境，其发展目标是类似JsBox和Workflow。
 
 本项目从[hyb1996](https://github.com/hyb1996/Auto.js) autojs 获得,并命名为Autox.js （autojs 修改版本），
